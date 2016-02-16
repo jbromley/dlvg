@@ -11,7 +11,7 @@ import random
 import numpy as np
 from collections import deque
 
-GAME = 'tetris' # the name of the game being played for log files
+GAME = 'pong' # the name of the game being played for log files
 ACTIONS = 6 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
 OBSERVE = 500. # timesteps to observe before training
