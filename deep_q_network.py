@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import tensorflow as tf
 import cv2
 import sys
@@ -195,13 +196,64 @@ def trainNetwork(s, readout, h_fc1, sess):
             cv2.imwrite("logs_tetris/frame" + str(t) + ".png", x_t1)
         '''
 
-def playGame():
-    sess = tf.InteractiveSession()
-    s, readout, h_fc1 = createNetwork()
-    trainNetwork(s, readout, h_fc1, sess)
+def playGame(s, readout, h_fc1, sess):
+    # Open up a game state to communicate with emulator.
+    game_state = game.GameState()
 
-def main():
-    playGame()
+    # Get the first state by doing nothing and preprocess the image to 80x80x4.
+    do_nothing = np.zeros(ACTIONS)
+    do_nothing[0] = 1
+    x_t, r_0, terminal = game_state.frame_step(do_nothing)
+    x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
+    ret, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
+    s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
+
+    # saving and loading networks
+    saver = tf.train.Saver()
+    #sess.run(tf.initialize_all_variables())
+    checkpoint = tf.train.get_checkpoint_state("saved_networks")
+    if checkpoint and checkpoint.model_checkpoint_path:
+        print "Restoring network weights..."
+        saver.restore(sess, checkpoint.model_checkpoint_path)
+        print "Successfully loaded:", checkpoint.model_checkpoint_path
+    else:
+        print "Could not restore network weights. Can't play."
+        sys.exit(-1)
+
+    t = 0
+    while True:
+        # choose an action epsilon greedily
+        readout_t = readout.eval(feed_dict = {s : [s_t]})[0]
+        a_t = np.zeros([ACTIONS])
+        action_index = np.argmax(readout_t)
+        a_t[action_index] = 1
+
+        for i in range(0, K):
+            # run the selected action and observe next state and reward
+            x_t1_col, r_t, terminal = game_state.frame_step(a_t)
+            x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (80, 80)), cv2.COLOR_BGR2GRAY)
+            ret, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
+            x_t1 = np.reshape(x_t1, (80, 80, 1))
+            s_t1 = np.append(s_t[:,:,1:], x_t1, axis = 2)
+
+        # update the old values
+        s_t = s_t1
+        t += 1
+
+def main(play_only):
+    sess = tf.InteractiveSession()
+    print "Creating network..."
+    s, readout, h_fc1 = createNetwork()
+    if not play_only:
+        print "Doing training..."
+        trainNetwork(s, readout, h_fc1, sess)
+    else:
+        print "Playing with trained network..."
+        playGame(s, readout, h_fc1, sess)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--play", help="Run network in play mode only", action="store_true")
+    args = parser.parse_args()
+
+    main(args.play)
