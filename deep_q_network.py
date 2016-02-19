@@ -12,16 +12,16 @@ import random
 import numpy as np
 from collections import deque
 
-GAME = 'pong' # the name of the game being played for log files
-ACTIONS = 6 # number of valid actions
-GAMMA = 0.99 # decay rate of past observations
+GAME = 'pong'  # the name of the game being played for log files
+ACTIONS = 3    # number of valid actions
+GAMMA = 0.99   # decay rate of past observations
 OBSERVE = 500. # timesteps to observe before training
 EXPLORE = 500. # frames over which to anneal epsilon
-FINAL_EPSILON = 0.05 # final value of epsilon
-INITIAL_EPSILON = 1.0 # starting value of epsilon
+FINAL_EPSILON = 0.05   # final value of epsilon
+INITIAL_EPSILON = 1.0  # starting value of epsilon
 REPLAY_MEMORY = 590000 # number of previous transitions to remember
-BATCH = 32 # size of minibatch
-K = 1 # only select an action every Kth frame, repeat prev for others
+BATCH = 32     # size of minibatch
+K = 1          # only select an action every Kth frame, repeat prev for others
 
 def weight_variable(shape):
     initial = tf.truncated_normal(shape, stddev = 0.01)
@@ -147,7 +147,7 @@ def trainNetwork(s, readout, h_fc1, sess):
         # only train if done observing
         if t > OBSERVE:
             # sample a minibatch to train on
-            minibatch = random.sample(D, BATCH)
+            minibatch = random.sample(list(D), BATCH)
 
             # get the batch variables
             s_j_batch = [d[0] for d in minibatch]
