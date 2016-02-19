@@ -92,8 +92,8 @@ def trainNetwork(s, readout, h_fc1, sess):
     D = deque()
 
     # printing
-    a_file = open("logs_" + GAME + "/readout.txt", 'w')
-    h_file = open("logs_" + GAME + "/hidden.txt", 'w')
+    # a_file = open("logs_" + GAME + "/readout.txt", 'w')
+    # h_file = open("logs_" + GAME + "/hidden.txt", 'w')
 
     # get the first state by doing nothing and preprocess the image to 80x80x4
     do_nothing = np.zeros(ACTIONS)
@@ -109,9 +109,9 @@ def trainNetwork(s, readout, h_fc1, sess):
     checkpoint = tf.train.get_checkpoint_state("saved_networks")
     if checkpoint and checkpoint.model_checkpoint_path:
         saver.restore(sess, checkpoint.model_checkpoint_path)
-        print "Successfully loaded:", checkpoint.model_checkpoint_path
+        print("Successfully loaded:", checkpoint.model_checkpoint_path)
     else:
-        print "Could not find old network weights"
+        print("Could not find old network weights")
 
     epsilon = INITIAL_EPSILON
     t = 0
@@ -186,15 +186,13 @@ def trainNetwork(s, readout, h_fc1, sess):
             state = "explore"
         else:
             state = "train"
-        print "TIMESTEP", t, "/ STATE", state, "/ EPSILON", epsilon, "/ ACTION", action_index, "/ REWARD", r_t, "/ Q_MAX %e" % np.max(readout_t)
+        print("TIMESTEP", t, "/ STATE", state, "/ EPSILON", epsilon, "/ ACTION", action_index, "/ REWARD", r_t, "/ Q_MAX %e" % np.max(readout_t))
 
         # write info to files
-        '''
-        if t % 10000 <= 100:
-            a_file.write(",".join([str(x) for x in readout_t]) + '\n')
-            h_file.write(",".join([str(x) for x in h_fc1.eval(feed_dict={s:[s_t]})[0]]) + '\n')
-            cv2.imwrite("logs_tetris/frame" + str(t) + ".png", x_t1)
-        '''
+        # if t % 10000 <= 100:
+        #     a_file.write(",".join([str(x) for x in readout_t]) + '\n')
+        #     h_file.write(",".join([str(x) for x in h_fc1.eval(feed_dict={s:[s_t]})[0]]) + '\n')
+        #     cv2.imwrite("logs_tetris/frame" + str(t) + ".png", x_t1)
 
 def playGame(s, readout, h_fc1, sess):
     # Open up a game state to communicate with emulator.
@@ -213,11 +211,11 @@ def playGame(s, readout, h_fc1, sess):
     #sess.run(tf.initialize_all_variables())
     checkpoint = tf.train.get_checkpoint_state("saved_networks")
     if checkpoint and checkpoint.model_checkpoint_path:
-        print "Restoring network weights..."
+        print("Restoring network weights...")
         saver.restore(sess, checkpoint.model_checkpoint_path)
-        print "Successfully loaded:", checkpoint.model_checkpoint_path
+        print("Successfully loaded:", checkpoint.model_checkpoint_path)
     else:
-        print "Could not restore network weights. Can't play."
+        print("Could not restore network weights. Can't play.")
         sys.exit(-1)
 
     t = 0
@@ -242,13 +240,13 @@ def playGame(s, readout, h_fc1, sess):
 
 def main(play_only):
     sess = tf.InteractiveSession()
-    print "Creating network..."
+    print("Creating network...")
     s, readout, h_fc1 = createNetwork()
     if not play_only:
-        print "Doing training..."
+        print("Doing training...")
         trainNetwork(s, readout, h_fc1, sess)
     else:
-        print "Playing with trained network..."
+        print("Playing with trained network...")
         playGame(s, readout, h_fc1, sess)
 
 if __name__ == "__main__":
