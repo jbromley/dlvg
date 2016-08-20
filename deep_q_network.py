@@ -5,14 +5,14 @@ import tensorflow as tf
 import cv2
 import sys
 sys.path.append("wrapped_games/")
-import pong_fun # whichever is imported "as game" will be used
-import dummy_game
+# import dummy_game
+# import pong_fun # whichever is imported "as game" will be used
 import pong_fun as game
 import random
 import numpy as np
 from collections import deque
 
-GAME = 'pong'  # the name of the game being played for log files
+GAME = 'pong'  # The name of the game being played. Used for log files.
 ACTIONS = 3    # number of valid actions
 GAMMA = 0.99   # decay rate of past observations
 OBSERVE = 500. # timesteps to observe before training
@@ -22,22 +22,54 @@ INITIAL_EPSILON = 1.0  # starting value of epsilon
 REPLAY_MEMORY = 590000 # number of previous transitions to remember
 BATCH = 32     # size of minibatch
 K = 1          # only select an action every Kth frame, repeat prev for others
+COST = [0, 0.001, 0.001]
 
 def weight_variable(shape):
+    """Return a TensorFlow weight variable with the given shape.
+
+    Arguments:
+    shape - the shape of the weight tensor.
+    """
     initial = tf.truncated_normal(shape, stddev = 0.01)
     return tf.Variable(initial)
 
 def bias_variable(shape):
+    """Return a TensorFlow bias variable with the given shape.
+
+    Arguments:
+    shape - the shape of the bias tensor.
+    """
     initial = tf.constant(0.01, shape = shape)
     return tf.Variable(initial)
 
 def conv2d(x, W, stride):
+    """Return a 2D TensorFlow convolution operation.
+
+    Arguments:
+    x -- the input vector
+    W -- the weight variable matrix for the convolution
+    stride -- the stride for the convolution
+    """
     return tf.nn.conv2d(x, W, strides = [1, stride, stride, 1], padding = "SAME")
 
 def max_pool_2x2(x):
-    return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = "SAME")
+    """Return a TensorFlow 2x2 max pooling operation.
 
-def createNetwork():
+    Arguments:
+    x -- the input vector
+    """
+    return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1],
+                          padding = "SAME")
+
+def create_network():
+    """Create the policy function.
+
+    Constructs the operations and placeholders that form the policy
+    function estimator. This consists of three convolutional layers
+    followed by two fully connected layers. The last layer is the
+    action output. Returns a tuple with the state TensorFlow
+    placeholder and the readout operation (the result of the network).
+    """
     # network weights
     W_conv1 = weight_variable([8, 8, 4, 32])
     b_conv1 = bias_variable([32])
@@ -75,10 +107,18 @@ def createNetwork():
     # readout layer
     readout = tf.matmul(h_fc1, W_fc2) + b_fc2
 
-    return s, readout, h_fc1
+    return s, readout
 
-def trainNetwork(s, readout, h_fc1, sess):
-    # define the cost function
+def train_network(s, readout, sess):
+    """Train the policy estimator.
+
+    Arguments:
+    s -- the TensorFlow placeholder for the state.
+    readout -- the output of the policy estimator.
+    sess -- the TensorFlow session to use for the computation.
+    """
+    # Define the cost function. The placeholders a and y will be fed from
+    # the batch samples we take at each step.
     a = tf.placeholder("float", [None, ACTIONS])
     y = tf.placeholder("float", [None])
     readout_action = tf.reduce_sum(tf.mul(readout, a), reduction_indices = 1)
@@ -88,22 +128,19 @@ def trainNetwork(s, readout, h_fc1, sess):
     # open up a game state to communicate with emulator
     game_state = game.GameState()
 
-    # store the previous observations in replay memory
+    # Create the experience replay buffer.
     D = deque()
 
-    # printing
-    # a_file = open("logs_" + GAME + "/readout.txt", 'w')
-    # h_file = open("logs_" + GAME + "/hidden.txt", 'w')
-
-    # get the first state by doing nothing and preprocess the image to 80x80x4
+    # Get the first state by doing nothing, preprocessing the image to 80x80x4,
+    # and then stacking up four images.
     do_nothing = np.zeros(ACTIONS)
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
     x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
-    ret, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
+    _, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
     s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
 
-    # saving and loading networks
+    # Confiugre things to save and load trained networks.
     saver = tf.train.Saver()
     sess.run(tf.initialize_all_variables())
     checkpoint = tf.train.get_checkpoint_state("saved_networks")
@@ -116,59 +153,64 @@ def trainNetwork(s, readout, h_fc1, sess):
     epsilon = INITIAL_EPSILON
     t = 0
     while True:
-        # choose an action epsilon greedily
+        # Choose an action epsilon greedily. A random action is chosen
+        # with probability epsilon *or* if we are still observing the
+        # game.
         readout_t = readout.eval(feed_dict = {s : [s_t]})[0]
         a_t = np.zeros([ACTIONS])
         action_index = 0
         if random.random() <= epsilon or t <= OBSERVE:
             action_index = random.randrange(ACTIONS)
-            a_t[random.randrange(ACTIONS)] = 1
         else:
             action_index = np.argmax(readout_t)
-            a_t[action_index] = 1
+        a_t[action_index] = 1
 
-        # scale down epsilon
+        # After the observation period, we gradually scale the epsilon
+        # down from 1 to the amount set for training.
         if epsilon > FINAL_EPSILON and t > OBSERVE:
             epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
         for i in range(0, K):
-            # run the selected action and observe next state and reward
+            # Run the selected action and observe next state, reward, and
+            # whether or not the resulting state is terminal.
             x_t1_col, r_t, terminal = game_state.frame_step(a_t)
-            x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (80, 80)), cv2.COLOR_BGR2GRAY)
-            ret, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
+
+            # Preprocess the image and build the state stack.
+            x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (80, 80)),
+                                cv2.COLOR_BGR2GRAY)
+            _, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
             x_t1 = np.reshape(x_t1, (80, 80, 1))
             s_t1 = np.append(x_t1, s_t[:,:,1:], axis = 2)
 
-            # store the transition in D
+            # Store the transition in the experience replay buffer (D).
             D.append((s_t, a_t, r_t, s_t1, terminal))
             if len(D) > REPLAY_MEMORY:
                 D.popleft()
 
-        # only train if done observing
+        # Only train if done observing.
         if t > OBSERVE:
-            # sample a minibatch to train on
+            # Sample a minibatch to train on from the experience replay buffer.
             minibatch = random.sample(list(D), BATCH)
 
-            # get the batch variables
+            # Get the batch variables: state, action, reward, next state, and
+            # whether or not the game terminated.
             s_j_batch = [d[0] for d in minibatch]
             a_batch = [d[1] for d in minibatch]
             r_batch = [d[2] for d in minibatch]
             s_j1_batch = [d[3] for d in minibatch]
+            terminal = [d[4] for d in minibatch]
 
             y_batch = []
             readout_j1_batch = readout.eval(feed_dict = {s : s_j1_batch})
             for i in range(0, len(minibatch)):
                 # if terminal only equals reward
-                if minibatch[i][4]:
+                if terminal[i]:
                     y_batch.append(r_batch[i])
                 else:
                     y_batch.append(r_batch[i] + GAMMA * np.max(readout_j1_batch[i]))
 
             # perform gradient step
-            train_step.run(feed_dict = {
-                y : y_batch,
-                a : a_batch,
-                s : s_j_batch})
+            train_step.run(feed_dict = {y: y_batch, a: a_batch, s: s_j_batch})
 
         # update the old values
         s_t = s_t1
@@ -186,15 +228,11 @@ def trainNetwork(s, readout, h_fc1, sess):
             state = "explore"
         else:
             state = "train"
-        print("TIMESTEP", t, "/ STATE", state, "/ EPSILON", epsilon, "/ ACTION", action_index, "/ REWARD", r_t, "/ Q_MAX %e" % np.max(readout_t))
+        print("TIMESTEP", t, "/ STATE", state, "/ EPSILON", epsilon,
+              "/ ACTION", action_index, "/ REWARD", r_t,
+              "/ Q_MAX %e" % np.max(readout_t))
 
-        # write info to files
-        # if t % 10000 <= 100:
-        #     a_file.write(",".join([str(x) for x in readout_t]) + '\n')
-        #     h_file.write(",".join([str(x) for x in h_fc1.eval(feed_dict={s:[s_t]})[0]]) + '\n')
-        #     cv2.imwrite("logs_tetris/frame" + str(t) + ".png", x_t1)
-
-def playGame(s, readout, h_fc1, sess):
+def play_game(s, readout, sess):
     # Open up a game state to communicate with emulator.
     game_state = game.GameState()
 
@@ -203,7 +241,7 @@ def playGame(s, readout, h_fc1, sess):
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
     x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
-    ret, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
+    _, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
     s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
 
     # saving and loading networks
@@ -230,7 +268,7 @@ def playGame(s, readout, h_fc1, sess):
             # run the selected action and observe next state and reward
             x_t1_col, r_t, terminal = game_state.frame_step(a_t)
             x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (80, 80)), cv2.COLOR_BGR2GRAY)
-            ret, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
+            _, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
             x_t1 = np.reshape(x_t1, (80, 80, 1))
             s_t1 = np.append(s_t[:,:,1:], x_t1, axis = 2)
 
@@ -241,13 +279,13 @@ def playGame(s, readout, h_fc1, sess):
 def main(play_only):
     sess = tf.InteractiveSession()
     print("Creating network...")
-    s, readout, h_fc1 = createNetwork()
+    s, readout = create_network()
     if not play_only:
         print("Doing training...")
-        trainNetwork(s, readout, h_fc1, sess)
+        train_network(s, readout, sess)
     else:
         print("Playing with trained network...")
-        playGame(s, readout, h_fc1, sess)
+        play_game(s, readout, sess)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
