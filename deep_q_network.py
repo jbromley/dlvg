@@ -7,7 +7,7 @@ import sys
 sys.path.append("wrapped_games/")
 # import dummy_game
 # import pong_fun # whichever is imported "as game" will be used
-import pong_fun as game
+import pong as game
 import random
 import numpy as np
 from collections import deque
