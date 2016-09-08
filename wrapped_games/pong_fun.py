@@ -14,7 +14,8 @@ position = 5, 325
 os.environ['SDL_VIDEO_WINDOW_POS'] = str(position[0]) + "," + str(position[1])
 pygame.init()
 screen = pygame.display.set_mode((640, 480), 0, 32)
-#screen = pygame.display.set_mode((640,480),pygame.NOFRAME)
+pygame.display.set_caption("PyPong", "PyPong")
+
 #Creating 2 bars, a ball and background.
 back = pygame.Surface((640, 480))
 background = back.convert()
@@ -30,8 +31,7 @@ circle = circ_sur.convert()
 circle.set_colorkey((0, 0, 0))
 font = pygame.font.SysFont("calibri", 40)
 
-
-ai_speed = 15.
+AI_SPEED = 15.
 
 HIT_REWARD = 0
 LOSE_REWARD = -1
@@ -46,18 +46,22 @@ class GameState:
         self.bar1_score, self.bar2_score = 0,0
         self.speed_x, self.speed_y = 7., 7.
 
-    def frame_step(self,input_vect):
+    def frame_step(self, input_vect):
         pygame.event.pump()
         reward = 0
 
         if sum(input_vect) != 1:
             raise ValueError('Multiple input actions!')
 
-        if input_vect[1] == 1:#Key up
-            self.bar1_move = -ai_speed
-        elif input_vect[2] == 1:#Key down
-            self.bar1_move = ai_speed
-        else: # don't move
+        # Process the player's action vector.
+        if input_vect[1] == 1:  
+            # Key up
+            self.bar1_move = -AI_SPEED
+        elif input_vect[2] == 1:
+            # Key down
+            self.bar1_move = AI_SPEED
+        else: 
+            # Don't move.
             self.bar1_move = 0
 
         self.score1 = font.render(str(self.bar1_score), True,(255,255,255))
@@ -74,23 +78,23 @@ class GameState:
 
         self.bar1_y += self.bar1_move
 
-        #AI of the computer.
+        # Implement a simple computer AI.
         if self.circle_x >= 305.:
             if not self.bar2_y == self.circle_y + 7.5:
                 if self.bar2_y < self.circle_y + 7.5:
-                    self.bar2_y += ai_speed
+                    self.bar2_y += AI_SPEED
                 if  self.bar2_y > self.circle_y - 42.5:
-                    self.bar2_y -= ai_speed
+                    self.bar2_y -= AI_SPEED
             else:
                 self.bar2_y == self.circle_y + 7.5
 
-        # bounds of movement
+        # Limit the paddles vertical motion to stay on the screen.
         if self.bar1_y >= 420.: self.bar1_y = 420.
         elif self.bar1_y <= 10. : self.bar1_y = 10.
         if self.bar2_y >= 420.: self.bar2_y = 420.
         elif self.bar2_y <= 10.: self.bar2_y = 10.
 
-        #since i don't know anything about collision, ball hitting bars goes like this.
+        # Use a very simple collision mode.
         if self.circle_x <= self.bar1_x + 10.:
             if self.circle_y >= self.bar1_y - 7.5 and self.circle_y <= self.bar1_y + 42.5:
                 self.circle_x = 20.
@@ -102,7 +106,7 @@ class GameState:
                 self.circle_x = 605.
                 self.speed_x = -self.speed_x
 
-        # scoring
+        # Scoring.
         if self.circle_x < 5.:
             self.bar2_score += 1
             reward = LOSE_REWARD
@@ -114,7 +118,7 @@ class GameState:
             self.circle_x, self.circle_y = 307.5, 232.5
             self.bar1_y, self.bar2_y = 215., 215.
 
-        # collisions on sides
+        # Handle collisions with the top and bottom of the screen.
         if self.circle_y <= 10.:
             self.speed_y = -self.speed_y
             self.circle_y = 10.
