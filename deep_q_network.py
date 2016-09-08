@@ -22,7 +22,6 @@ INITIAL_EPSILON = 1.0  # starting value of epsilon
 REPLAY_MEMORY = 590000 # number of previous transitions to remember
 BATCH = 32     # size of minibatch
 K = 1          # only select an action every Kth frame, repeat prev for others
-COST = [0, 0.001, 0.001]
 
 def weight_variable(shape):
     """Return a TensorFlow weight variable with the given shape.
@@ -129,7 +128,7 @@ def train_network(s, readout, sess):
     game_state = game.GameState()
 
     # Create the experience replay buffer.
-    D = deque()
+    D = deque(maxlen=REPLAY_MEMORY)
 
     # Get the first state by doing nothing, preprocessing the image to 80x80x4,
     # and then stacking up four images.
@@ -180,12 +179,10 @@ def train_network(s, readout, sess):
                                 cv2.COLOR_BGR2GRAY)
             _, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
             x_t1 = np.reshape(x_t1, (80, 80, 1))
-            s_t1 = np.append(x_t1, s_t[:,:,1:], axis = 2)
+            s_t1 = np.append(x_t1, s_t[:,:,:3], axis = 2)
 
             # Store the transition in the experience replay buffer (D).
             D.append((s_t, a_t, r_t, s_t1, terminal))
-            if len(D) > REPLAY_MEMORY:
-                D.popleft()
 
         # Only train if done observing.
         if t > OBSERVE:
@@ -228,9 +225,8 @@ def train_network(s, readout, sess):
             state = "explore"
         else:
             state = "train"
-        print("TIMESTEP", t, "/ STATE", state, "/ EPSILON", epsilon,
-              "/ ACTION", action_index, "/ REWARD", r_t,
-              "/ Q_MAX %e" % np.max(readout_t))
+        if t % 1000 == 0:
+            print("TIMESTEP %d / STATE %s / EPSILON %f / ACTION %d / REWARD %d / Q_MAX %e" % (t, state, epsilon, action_index, r_t, np.max(readout_t)))
 
 def play_game(s, readout, sess):
     # Open up a game state to communicate with emulator.
