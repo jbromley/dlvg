@@ -139,18 +139,21 @@ def train_network(s, readout, sess):
     _, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
     s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
 
+    epsilon = INITIAL_EPSILON
+    t = 0
+
     # Confiugre things to save and load trained networks.
     saver = tf.train.Saver()
     sess.run(tf.initialize_all_variables())
     checkpoint = tf.train.get_checkpoint_state("saved_networks")
     if checkpoint and checkpoint.model_checkpoint_path:
         saver.restore(sess, checkpoint.model_checkpoint_path)
+        epsilon = FINAL_EPSILON
+        t = OBSERVE + 1
         print("Successfully loaded:", checkpoint.model_checkpoint_path)
     else:
         print("Could not find old network weights")
 
-    epsilon = INITIAL_EPSILON
-    t = 0
     while True:
         # Choose an action epsilon greedily. A random action is chosen
         # with probability epsilon *or* if we are still observing the
@@ -207,6 +210,9 @@ def train_network(s, readout, sess):
                     y_batch.append(r_batch[i] + GAMMA * np.max(readout_j1_batch[i]))
 
             # perform gradient step
+            print("a_batch (%d elements): %s" % (len(a_batch), a_batch))
+            print("y_batch (%d elements): %s" % (len(y_batch), y_batch))
+            sys.exit(0)
             train_step.run(feed_dict = {y: y_batch, a: a_batch, s: s_j_batch})
 
         # update the old values
