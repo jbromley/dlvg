@@ -149,7 +149,6 @@ def train_network(s, readout, sess):
     if checkpoint and checkpoint.model_checkpoint_path:
         saver.restore(sess, checkpoint.model_checkpoint_path)
         epsilon = FINAL_EPSILON
-        t = OBSERVE + 1
         print("Successfully loaded:", checkpoint.model_checkpoint_path)
     else:
         print("Could not find old network weights")
@@ -210,9 +209,6 @@ def train_network(s, readout, sess):
                     y_batch.append(r_batch[i] + GAMMA * np.max(readout_j1_batch[i]))
 
             # perform gradient step
-            print("a_batch (%d elements): %s" % (len(a_batch), a_batch))
-            print("y_batch (%d elements): %s" % (len(y_batch), y_batch))
-            sys.exit(0)
             train_step.run(feed_dict = {y: y_batch, a: a_batch, s: s_j_batch})
 
         # update the old values
