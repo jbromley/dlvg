@@ -127,13 +127,12 @@ def create_q_fn():
 
     return s, q
 
-def create_loss_fn(q_star, global_step):
+def create_loss_fn(q_star):
     """Create an operation to compute the loss function.
 
     Parameters
     ----------
     q_star : estimate of the action-value function
-    global_step : the global time step counter
 
     Returns
     -------
@@ -204,7 +203,7 @@ def train_network(s, q_star, sess):
     # Define the loss function and training operation. The
     # placeholders a and y will be fed from the batch samples we take
     # at each step.
-    a, y, loss = create_loss_fn(q_star, global_step)
+    a, y, loss = create_loss_fn(q_star)
     train_step = tf.train.AdamOptimizer(1e-6).minimize(loss)
 
     # Configure things to save and load trained networks.
@@ -214,7 +213,8 @@ def train_network(s, q_star, sess):
     if checkpoint and checkpoint.model_checkpoint_path:
         saver.restore(sess, checkpoint.model_checkpoint_path)
         epsilon = FINAL_EPSILON
-        print("Loaded %s." % (checkpoint.model_checkpoint_path,))
+        print("Loaded %s (step %d)." %
+              (checkpoint.model_checkpoint_path, global_step.eval(session=sess)))
     else:
         print("No checkpoints found.")
 
@@ -235,7 +235,7 @@ def train_network(s, q_star, sess):
         q_star_t = q_star.eval(feed_dict = {s : [s_t]}, session=sess)[0]
         a_t = np.zeros([ACTIONS])
         action_index = 0
-        if random.random() <= epsilon or t <= OBSERVE:
+        if random.random() <= epsilon or len(D) <= OBSERVE:
             action_index = random.randrange(ACTIONS)
         else:
             action_index = np.argmax(q_star_t)
@@ -243,7 +243,7 @@ def train_network(s, q_star, sess):
 
         # After the observation period, we gradually scale the epsilon
         # down from 1 to the amount set for training.
-        if epsilon > FINAL_EPSILON and t > OBSERVE:
+        if epsilon > FINAL_EPSILON and len(D) > OBSERVE:
             epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
         for i in range(0, K):
@@ -258,7 +258,7 @@ def train_network(s, q_star, sess):
             D.append((s_t, a_t, r_t, s_t1, terminal))
 
         # Only train if done observing.
-        if t > OBSERVE:
+        if len(D) > OBSERVE:
             # Sample a minibatch to train on from the experience replay buffer.
             minibatch = random.sample(list(D), BATCH)
 
@@ -292,7 +292,7 @@ def train_network(s, q_star, sess):
 
         # save progress every 10000 iterations
         if t % 10000 == 0:
-            saver.save(sess, CHKPT_DIR + os.sep + GAME, global_step=t)
+            saver.save(sess, CHKPT_DIR + os.sep + GAME, global_step=global_step)
 
 def play_game(s, readout, sess):
     # Open up a game state to communicate with emulator.
