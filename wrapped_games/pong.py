@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-#Modified from http://www.pygame.org/project-Very+simple+Pong+game-816-.html
-
+# Modified from http://www.pygame.org/project-Very+simple+Pong+game-816-.html
 import numpy
 import pygame
 import os
@@ -8,7 +7,6 @@ from pygame.locals import *
 from sys import exit
 import random
 import pygame.surfarray as surfarray
-# import matplotlib.pyplot as plt
 
 position = 5, 325
 os.environ['SDL_VIDEO_WINDOW_POS'] = str(position[0]) + "," + str(position[1])
@@ -31,7 +29,7 @@ circle = circ_sur.convert()
 circle.set_colorkey((0, 0, 0))
 font = pygame.font.SysFont("calibri", 40)
 
-AI_SPEED = 15.
+PADDLE_SPEED = 15.
 
 HIT_REWARD = 0
 LOSE_REWARD = -1
@@ -54,13 +52,13 @@ class GameState:
             raise ValueError('Multiple input actions!')
 
         # Process the player's action vector.
-        if input_vect[1] == 1:  
+        if input_vect[1] == 1:
             # Key up
-            self.bar1_move = -AI_SPEED
+            self.bar1_move = -PADDLE_SPEED
         elif input_vect[2] == 1:
             # Key down
-            self.bar1_move = AI_SPEED
-        else: 
+            self.bar1_move = PADDLE_SPEED
+        else:
             # Don't move.
             self.bar1_move = 0
 
@@ -82,11 +80,10 @@ class GameState:
         if self.circle_x >= 305.:
             if not self.bar2_y == self.circle_y + 7.5:
                 if self.bar2_y < self.circle_y + 7.5:
-                    self.bar2_y += AI_SPEED
+                    self.bar2_move = PADDLE_SPEED
                 if  self.bar2_y > self.circle_y - 42.5:
-                    self.bar2_y -= AI_SPEED
-            else:
-                self.bar2_y == self.circle_y + 7.5
+                    self.bar2_move = -PADDLE_SPEED
+            self.bar2_y += self.bar2_move
 
         # Limit the paddles vertical motion to stay on the screen.
         if self.bar1_y >= 420.: self.bar1_y = 420.
@@ -99,22 +96,26 @@ class GameState:
             if self.circle_y >= self.bar1_y - 7.5 and self.circle_y <= self.bar1_y + 42.5:
                 self.circle_x = 20.
                 self.speed_x = -self.speed_x
+                self.speed_y += (self.bar1_move / 5)
                 reward = HIT_REWARD
 
         if self.circle_x >= self.bar2_x - 15.:
             if self.circle_y >= self.bar2_y - 7.5 and self.circle_y <= self.bar2_y + 42.5:
                 self.circle_x = 605.
                 self.speed_x = -self.speed_x
+                self.speed_y += (self.bar2_move / 5)
 
         # Scoring.
         if self.circle_x < 5.:
             self.bar2_score += 1
             reward = LOSE_REWARD
             self.circle_x, self.circle_y = 320., 232.5
+            self.speed_y = random.choice([-1, 1]) * 7
             self.bar1_y,self.bar_2_y = 215., 215.
         elif self.circle_x > 620.:
             self.bar1_score += 1
             reward = SCORE_REWARD
+            self.speed_y = random.choice([-1, 1]) * 7
             self.circle_x, self.circle_y = 307.5, 232.5
             self.bar1_y, self.bar2_y = 215., 215.
 
