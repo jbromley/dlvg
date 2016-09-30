@@ -13,16 +13,16 @@ sys.path.append("wrapped_games/")
 import pong as game
 
 GAME = 'pong'  # The name of the game being played. Used for log files.
-CHKPT_DIR = "checkpoints"
+CHKPT_DIR = "checkpoints-nv"
 ACTIONS = 3    # number of valid actions
 GAMMA = 0.99   # decay rate of past observations
-OBSERVE = 5000 # timesteps to observe before training
-EXPLORE = 5000 # frames over which to anneal epsilon
+OBSERVE = 50000 # timesteps to observe before training
+EXPLORE = 50000 # frames over which to anneal epsilon
 FINAL_EPSILON = 0.1    # final value of epsilon
 INITIAL_EPSILON = 1.0  # starting value of epsilon
 REPLAY_MEMORY = 590000 # number of previous transitions to remember
 BATCH = 32     # size of minibatch
-K = 1          # only select an action every Kth frame, repeat prev for others
+K = 4          # only select an action every Kth frame, repeat prev for others
 
 def weight_variable(shape, name=None):
     """Return a TensorFlow weight variable with the given shape.
@@ -100,7 +100,7 @@ def create_q_fn():
           operation
     """
     # Input placeholder
-    s = tf.placeholder("float", [None, 80, 80, 4])
+    s = tf.placeholder("float", [None, 84, 84, 4])
 
     # Network weights
     with tf.name_scope("q_star"):
@@ -111,7 +111,7 @@ def create_q_fn():
             b_conv2 = bias_variable([64], name="b_conv2")
             W_conv3 = weight_variable([3, 3, 64, 64], name="W_conv3")
             b_conv3 = bias_variable([64], name="b_conv3")
-            W_fc1 = weight_variable([1600, 512], name="W_fc1")
+            W_fc1 = weight_variable([2304, 512], name="W_fc1")
             b_fc1 = bias_variable([512], name="b_fc1")
             W_fc2 = weight_variable([512, ACTIONS], name="W_fc2")
             b_fc2 = bias_variable([ACTIONS], name="b_fc2")
@@ -121,7 +121,7 @@ def create_q_fn():
         h_pool1 = max_pool_2x2(h_conv1, name="pool1")
         h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2, 2) + b_conv2, name="conv2")
         h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3, name="conv3")
-        h_conv3_flat = tf.reshape(h_conv3, [-1, 1600], name="flatten")
+        h_conv3_flat = tf.reshape(h_conv3, [-1, 2304], name="flatten")
         h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1, name="fc1")
         q = tf.add(tf.matmul(h_fc1, W_fc2), b_fc2, name="fc2")
 
@@ -163,7 +163,7 @@ def initialize_state(game_state):
     do_nothing = np.zeros(ACTIONS)
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
-    x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
+    x_t = cv2.cvtColor(cv2.resize(x_t, (84, 84)), cv2.COLOR_BGR2GRAY)
     # _, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
     s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
 
@@ -181,9 +181,9 @@ def update_state(s_t, x_t1_col):
     -------
     out : the updated state
     """
-    x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (80, 80)), cv2.COLOR_BGR2GRAY)
+    x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (84, 84)), cv2.COLOR_BGR2GRAY)
     #_, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
-    x_t1 = np.reshape(x_t1, (80, 80, 1))
+    x_t1 = np.reshape(x_t1, (84, 84, 1))
     s_t1 = np.append(x_t1, s_t[:,:,:3], axis = 2)
     return s_t1
 
@@ -302,7 +302,7 @@ def play_game(s, readout, sess):
     do_nothing = np.zeros(ACTIONS)
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
-    x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
+    x_t = cv2.cvtColor(cv2.resize(x_t, (84, 84)), cv2.COLOR_BGR2GRAY)
     _, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
     s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
 
@@ -328,9 +328,9 @@ def play_game(s, readout, sess):
         for i in range(0, K):
             # run the selected action and observe next state and reward
             x_t1_col, r_t, terminal = game_state.frame_step(a_t)
-            x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (80, 80)), cv2.COLOR_BGR2GRAY)
+            x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (84, 84)), cv2.COLOR_BGR2GRAY)
             _, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
-            x_t1 = np.reshape(x_t1, (80, 80, 1))
+            x_t1 = np.reshape(x_t1, (84, 84, 1))
             s_t1 = np.append(s_t[:,:,1:], x_t1, axis = 2)
 
         # update the old values
