@@ -11,8 +11,8 @@ from collections import deque
 sys.path.append("wrapped_games/")
 import pong as game
 
-GAME = 'pong'  # The name of the game being played. Used for log files.
-CHKPT_DIR = "checkpoints-v"
+GAME = "pong"  # The name of the game being played. Used for log files.
+CHKPT_DIR = "chkpts-" + GAME
 ACTIONS = 3      # number of valid actions
 GAMMA = 0.99     # decay rate of past observations
 OBSERVE = 100000 # timesteps to observe before training
@@ -225,9 +225,13 @@ def train_network(s, q_star, sess):
 
     # Create the experience replay buffer.
     D = deque(maxlen=REPLAY_MEMORY)
-
     t = global_step.eval(session=sess)
 
+    ep_t = 0
+    ep = 0
+    ep_reward = 0
+    ep_q = 0.0
+    
     while True:
         # Choose an action epsilon greedily. A random action is chosen
         # with probability epsilon *or* if we are still observing the
@@ -240,6 +244,8 @@ def train_network(s, q_star, sess):
         else:
             action_index = np.argmax(q_star_t)
         a_t[action_index] = 1
+
+        ep_q += np.max(q_star_t)
 
         # After the observation period, we gradually scale the epsilon
         # down from 1 to the amount set for training.
@@ -257,6 +263,8 @@ def train_network(s, q_star, sess):
             # Store the transition in the experience replay buffer (D).
             D.append((s_t, a_t, r_t, s_t1, terminal))
 
+            ep_reward += r_t
+
         # Only train if done observing.
         if t > OBSERVE:
             # Sample a minibatch to train on from the experience replay buffer.
@@ -268,12 +276,12 @@ def train_network(s, q_star, sess):
             a_batch = [d[1] for d in minibatch]
             r_batch = [d[2] for d in minibatch]
             s_j1_batch = [d[3] for d in minibatch]
-            terminal = [d[4] for d in minibatch]
+            terminal_batch = [d[4] for d in minibatch]
 
             y_batch = []
             q_star_j1_batch = q_star.eval(feed_dict = {s : s_j1_batch}, session=sess)
             for i in range(0, len(minibatch)):
-                if terminal[i]:
+                if terminal_batch[i]:
                     y_batch.append(r_batch[i])
                 else:
                     y_batch.append(r_batch[i] + GAMMA * np.max(q_star_j1_batch[i]))
@@ -282,23 +290,28 @@ def train_network(s, q_star, sess):
             train_step.run(feed_dict = {y: y_batch, a: a_batch, s: s_j_batch},
                            session=sess)
 
-        # print info
-        print("t=%d, epsilon=%f, action %d, r_t=%d,  Q_max=%e" %
-              (t, epsilon, action_index, r_t, np.max(q_star_t)))
+        # If the state was terminal, print some information.
+        if terminal:
+            ep += 1
+            print("t=%d, episode=%d, epsilon=%f, r_total=%d, Q_avg=%e" %
+                  (t, ep, epsilon, ep_reward, ep_q / (t - ep_t)))
+            ep_reward = 0
+            ep_q = 0
+            ep_t = t
 
         # Update the old values.
         s_t = s_t1
         t = update_step.eval(session=sess)
 
         # save progress every 10000 iterations
-        if t % 10000 == 0:
+        if t % 100000 == 0:
             saver.save(sess, CHKPT_DIR + os.sep + GAME, global_step=global_step)
 
 def play_game(s, readout, sess):
     # Open up a game state to communicate with emulator.
     game_state = game.GameState()
 
-    # Get the first state by doing nothing and preprocess the image to 80x80x4.
+    # Get the first state by doing nothing and preprocess the image to 84x84x4.
     do_nothing = np.zeros(ACTIONS)
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
@@ -350,7 +363,16 @@ def main(play_only):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--play", help="Run network in play mode only", action="store_true")
+    parser.add_argument("-p", "--play", help="Run network in play mode only", action="store_true")
+    parser.add_argument("-r", "--run-suffix", help="Suffix for checkpoints directory.")
+    parser.add_argument("-k", "--skip-act", help="Interval for choosing new action", type=int, default=4)
     args = parser.parse_args()
+
+    # Set up name of directory where we save checkpoints.
+    if args.run_suffix is not None:
+        CHKPT_DIR += ("-" + args.run_suffix)
+    print("Saving checkpoints to %s" % (CHKPT_DIR,))
+
+    K = args.skip_act
 
     main(args.play)
