@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import argparse
 import cv2
 import numpy as np
@@ -13,16 +12,17 @@ sys.path.append("wrapped_games/")
 import pong as game
 
 GAME = 'pong'  # The name of the game being played. Used for log files.
-CHKPT_DIR = "checkpoints-nv"
-ACTIONS = 3    # number of valid actions
-GAMMA = 0.99   # decay rate of past observations
-OBSERVE = 50000 # timesteps to observe before training
-EXPLORE = 50000 # frames over which to anneal epsilon
+CHKPT_DIR = "checkpoints-v"
+ACTIONS = 3      # number of valid actions
+GAMMA = 0.99     # decay rate of past observations
+OBSERVE = 100000 # timesteps to observe before training
+EXPLORE = 100000 # frames over which to anneal epsilon
+LEARNING_RATE = 1e-6 # Learning rate
 FINAL_EPSILON = 0.1    # final value of epsilon
 INITIAL_EPSILON = 1.0  # starting value of epsilon
 REPLAY_MEMORY = 590000 # number of previous transitions to remember
-BATCH = 32     # size of minibatch
-K = 4          # only select an action every Kth frame, repeat prev for others
+BATCH = 32       # size of minibatch
+K = 4            # only select an action every Kth frame, repeat prev for others
 
 def weight_variable(shape, name=None):
     """Return a TensorFlow weight variable with the given shape.
@@ -204,7 +204,7 @@ def train_network(s, q_star, sess):
     # placeholders a and y will be fed from the batch samples we take
     # at each step.
     a, y, loss = create_loss_fn(q_star)
-    train_step = tf.train.AdamOptimizer(1e-6).minimize(loss)
+    train_step = tf.train.AdamOptimizer(LEARNING_RATE).minimize(loss)
 
     # Configure things to save and load trained networks.
     saver = tf.train.Saver()
@@ -243,7 +243,7 @@ def train_network(s, q_star, sess):
 
         # After the observation period, we gradually scale the epsilon
         # down from 1 to the amount set for training.
-        if epsilon > FINAL_EPSILON and len(D) > OBSERVE:
+        if epsilon > FINAL_EPSILON and t > OBSERVE:
             epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
         for i in range(0, K):
@@ -258,7 +258,7 @@ def train_network(s, q_star, sess):
             D.append((s_t, a_t, r_t, s_t1, terminal))
 
         # Only train if done observing.
-        if len(D) > OBSERVE:
+        if t > OBSERVE:
             # Sample a minibatch to train on from the experience replay buffer.
             minibatch = random.sample(list(D), BATCH)
 
