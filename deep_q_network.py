@@ -104,26 +104,30 @@ def create_q_fn():
 
     # Network weights
     with tf.name_scope("q_star"):
-        with tf.name_scope("variables"):
-            W_conv1 = weight_variable([8, 8, 4, 32], name="W_conv1")
-            b_conv1 = bias_variable([32], name="b_conv1")
-            W_conv2 = weight_variable([4, 4, 32, 64], name="W_conv2")
-            b_conv2 = bias_variable([64], name="b_conv2")
-            W_conv3 = weight_variable([3, 3, 64, 64], name="W_conv3")
-            b_conv3 = bias_variable([64], name="b_conv3")
-            W_fc1 = weight_variable([2304, 512], name="W_fc1")
-            b_fc1 = bias_variable([512], name="b_fc1")
-            W_fc2 = weight_variable([512, ACTIONS], name="W_fc2")
-            b_fc2 = bias_variable([ACTIONS], name="b_fc2")
-
-        # Network operations
+        # First convolutional layer.
+        W_conv1 = weight_variable([8, 8, 4, 16], name="W_conv1")
+        b_conv1 = bias_variable([32], name="b_conv1")
         h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1, name="conv1")
-        h_pool1 = max_pool_2x2(h_conv1, name="pool1")
-        h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2, 2) + b_conv2, name="conv2")
-        h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3, name="conv3")
-        h_conv3_flat = tf.reshape(h_conv3, [-1, 2304], name="flatten")
-        h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1, name="fc1")
+
+        # Second convolutional layer.
+        W_conv2 = weight_variable([4, 4, 16, 32], name="W_conv2")
+        b_conv2 = bias_variable([64], name="b_conv2")
+        h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2, name="conv2")
+
+        shape = h_conv2.get_shape().as_list()
+        h_flatten = tf.reshape(hconv2, [-1, reduce(lambda x, y: x * y, shape[1:])])
+
+        # First fully connected layer.
+        shape = h_flatten.get_shape().as_list()
+        W_fc1 = weight_variable([shape[1], 256], name="W_fc1")
+        b_fc1 = bias_variable([256], name="b_fc1")
+        h_fc1 = tf.nn.relu(tf.matmul(h_flatten, W_fc1) + b_fc1, name="fc1")
+
+        # Output layer.
+        W_fc2 = weight_variable([256, ACTIONS], name="W_fc2")
+        b_fc2 = bias_variable([ACTIONS], name="b_fc2")
         q = tf.add(tf.matmul(h_fc1, W_fc2), b_fc2, name="fc2")
+
 
     return s, q
 
@@ -265,6 +269,9 @@ def train_network(s, q_star, sess):
 
             ep_reward += r_t
 
+            if terminal:
+                break
+
         # Only train if done observing.
         if t > OBSERVE:
             # Sample a minibatch to train on from the experience replay buffer.
@@ -342,7 +349,7 @@ def play_game(s, readout, sess):
             # run the selected action and observe next state and reward
             x_t1_col, r_t, terminal = game_state.frame_step(a_t)
             x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (84, 84)), cv2.COLOR_BGR2GRAY)
-            _, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
+            #_, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
             x_t1 = np.reshape(x_t1, (84, 84, 1))
             s_t1 = np.append(s_t[:,:,1:], x_t1, axis = 2)
 
