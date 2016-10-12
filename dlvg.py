@@ -8,7 +8,6 @@ import sys
 import tensorflow as tf
 from collections import deque
 
-sys.path.append("wrapped_games/")
 import pong as game
 
 GAME = "pong"  # The name of the game being played. Used for log files.
@@ -235,7 +234,7 @@ def train_network(s, q_star, sess):
     ep = 0
     ep_reward = 0
     ep_q = 0.0
-    
+
     while True:
         # Choose an action epsilon greedily. A random action is chosen
         # with probability epsilon *or* if we are still observing the
@@ -256,21 +255,25 @@ def train_network(s, q_star, sess):
         if epsilon > FINAL_EPSILON and t > OBSERVE:
             epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
+        reward = 0
         for i in range(0, K):
             # Run the selected action and observe next state, reward, and
             # whether or not the resulting state is terminal.
-            x_t1_col, r_t, terminal = game_state.frame_step(a_t)
-
-            # Preprocess the image and build the state stack.
-            s_t1 = update_state(s_t, x_t1_col)
-
-            # Store the transition in the experience replay buffer (D).
-            D.append((s_t, a_t, r_t, s_t1, terminal))
-
+            if i == 0:
+                x_t1_col, r_t, terminal = game_state.frame_step(a_t)
+            else:
+                _, r_t, terminal = game_state.frame_step(a_t)
+            reward += r_t
             ep_reward += r_t
 
             if terminal:
                 break
+
+        # Preprocess the image and build the state stack.
+        s_t1 = update_state(s_t, x_t1_col)
+
+        # Store the transition in the experience replay buffer (D).
+        D.append((s_t, a_t, reward, s_t1, terminal))
 
         # Only train if done observing.
         if t > OBSERVE:
