@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 import argparse
-import cv2
 import numpy as np
 import os
 import random
 import sys
 import tensorflow as tf
 from collections import deque
+from functools import reduce
+from skimage.transform import resize
+from skimage.color import rgb2gray
 
 import pong as game
 
@@ -105,16 +107,16 @@ def create_q_fn():
     with tf.name_scope("q_star"):
         # First convolutional layer.
         W_conv1 = weight_variable([8, 8, 4, 16], name="W_conv1")
-        b_conv1 = bias_variable([32], name="b_conv1")
+        b_conv1 = bias_variable([16], name="b_conv1")
         h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1, name="conv1")
 
         # Second convolutional layer.
         W_conv2 = weight_variable([4, 4, 16, 32], name="W_conv2")
-        b_conv2 = bias_variable([64], name="b_conv2")
+        b_conv2 = bias_variable([32], name="b_conv2")
         h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2, name="conv2")
 
         shape = h_conv2.get_shape().as_list()
-        h_flatten = tf.reshape(hconv2, [-1, reduce(lambda x, y: x * y, shape[1:])])
+        h_flatten = tf.reshape(h_conv2, [-1, reduce(lambda x, y: x * y, shape[1:])])
 
         # First fully connected layer.
         shape = h_flatten.get_shape().as_list()
@@ -166,8 +168,7 @@ def initialize_state(game_state):
     do_nothing = np.zeros(ACTIONS)
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
-    x_t = cv2.cvtColor(cv2.resize(x_t, (84, 84)), cv2.COLOR_BGR2GRAY)
-    # _, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
+    x_t = resize(rgb2gray(x_t), (84, 84))
     s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
 
     return s_t
@@ -184,8 +185,7 @@ def update_state(s_t, x_t1_col):
     -------
     out : the updated state
     """
-    x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (84, 84)), cv2.COLOR_BGR2GRAY)
-    #_, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
+    x_t1 = resize(rgb2gray(x_t1_col), (84, 84))
     x_t1 = np.reshape(x_t1, (84, 84, 1))
     s_t1 = np.append(x_t1, s_t[:,:,:3], axis = 2)
     return s_t1
@@ -325,8 +325,7 @@ def play_game(s, readout, sess):
     do_nothing = np.zeros(ACTIONS)
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
-    x_t = cv2.cvtColor(cv2.resize(x_t, (84, 84)), cv2.COLOR_BGR2GRAY)
-    _, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
+    x_t = resize(rgb2gray(x_t), (84, 84))
     s_t = np.stack((x_t, x_t, x_t, x_t), axis = 2)
 
     # saving and loading networks
@@ -351,8 +350,7 @@ def play_game(s, readout, sess):
         for i in range(0, K):
             # run the selected action and observe next state and reward
             x_t1_col, r_t, terminal = game_state.frame_step(a_t)
-            x_t1 = cv2.cvtColor(cv2.resize(x_t1_col, (84, 84)), cv2.COLOR_BGR2GRAY)
-            #_, x_t1 = cv2.threshold(x_t1,1,255,cv2.THRESH_BINARY)
+            x_t1 = resize(rgb2gray(x_t1_col), (84, 84))
             x_t1 = np.reshape(x_t1, (84, 84, 1))
             s_t1 = np.append(s_t[:,:,1:], x_t1, axis = 2)
 
