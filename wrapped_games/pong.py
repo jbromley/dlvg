@@ -39,7 +39,7 @@ class GameState:
     def __init__(self):
         self.bar1_x, self.bar2_x = 10. , 620.
         self.bar1_y, self.bar2_y = 215. , 215.
-        self.circle_x, self.circle_y = 307.5, 232.5
+        self.ball_x, self.ball_y = 307.5, 232.5
         self.bar1_move, self.bar2_move = 0. , 0.
         self.bar1_score, self.bar2_score = 0,0
         self.speed_x, self.speed_y = 7., 7.
@@ -70,18 +70,18 @@ class GameState:
         middle_line = pygame.draw.aaline(screen,(255,255,255),(330,5),(330,475))
         screen.blit(bar1,(self.bar1_x,self.bar1_y))
         screen.blit(bar2,(self.bar2_x,self.bar2_y))
-        screen.blit(circle,(self.circle_x,self.circle_y))
+        screen.blit(circle,(self.ball_x,self.ball_y))
         screen.blit(self.score1,(250.,210.))
         screen.blit(self.score2,(380.,210.))
 
         self.bar1_y += self.bar1_move
 
         # Implement a simple computer AI.
-        if self.circle_x >= 305.:
-            if not self.bar2_y == self.circle_y + 7.5:
-                if self.bar2_y < self.circle_y + 7.5:
+        if self.ball_x >= 305.:
+            if not self.bar2_y == self.ball_y + 7.5:
+                if self.bar2_y < self.ball_y + 7.5:
                     self.bar2_move = PADDLE_SPEED
-                if  self.bar2_y > self.circle_y - 42.5:
+                if  self.bar2_y > self.ball_y - 7.5:
                     self.bar2_move = -PADDLE_SPEED
             self.bar2_y += self.bar2_move
 
@@ -92,43 +92,43 @@ class GameState:
         elif self.bar2_y <= 10.: self.bar2_y = 10.
 
         # Use a very simple collision mode.
-        if self.circle_x <= self.bar1_x + 10.:
-            if self.circle_y >= self.bar1_y - 7.5 and self.circle_y <= self.bar1_y + 42.5:
-                self.circle_x = 20.
+        if self.ball_x <= self.bar1_x + 10.:
+            if self.ball_y >= self.bar1_y - 7.5 and self.ball_y <= self.bar1_y + 42.5:
+                self.ball_x = 20.
                 self.speed_x = -self.speed_x
                 self.speed_y += (self.bar1_move / 5)
                 reward = HIT_REWARD
 
-        if self.circle_x >= self.bar2_x - 15.:
-            if self.circle_y >= self.bar2_y - 7.5 and self.circle_y <= self.bar2_y + 42.5:
-                self.circle_x = 605.
+        if self.ball_x >= self.bar2_x - 15.:
+            if self.ball_y >= self.bar2_y - 7.5 and self.ball_y <= self.bar2_y + 42.5:
+                self.ball_x = 605.
                 self.speed_x = -self.speed_x
                 self.speed_y += (self.bar2_move / 5)
 
         # Scoring.
-        if self.circle_x < 5.:
+        if self.ball_x < 5.:
             self.bar2_score += 1
             reward = LOSE_REWARD
-            self.circle_x, self.circle_y = 320., 232.5
+            self.ball_x, self.ball_y = 320., 232.5
             self.speed_y = random.choice([-1, 1]) * 7
             self.bar1_y,self.bar_2_y = 215., 215.
-        elif self.circle_x > 620.:
+        elif self.ball_x > 620.:
             self.bar1_score += 1
             reward = SCORE_REWARD
             self.speed_y = random.choice([-1, 1]) * 7
-            self.circle_x, self.circle_y = 307.5, 232.5
+            self.ball_x, self.ball_y = 307.5, 232.5
             self.bar1_y, self.bar2_y = 215., 215.
 
         # Handle collisions with the top and bottom of the screen.
-        if self.circle_y <= 10.:
+        if self.ball_y <= 10.:
             self.speed_y = -self.speed_y
-            self.circle_y = 10.
-        elif self.circle_y >= 457.5:
+            self.ball_y = 10.
+        elif self.ball_y >= 457.5:
             self.speed_y = -self.speed_y
-            self.circle_y = 457.5
+            self.ball_y = 457.5
 
-        self.circle_x += self.speed_x
-        self.circle_y += self.speed_y
+        self.ball_x += self.speed_x
+        self.ball_y += self.speed_y
 
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
 
